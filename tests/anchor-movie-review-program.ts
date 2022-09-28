@@ -27,6 +27,11 @@ describe("anchor-movie-review-program", () => {
     program.programId
   );
 
+  const [commentCounterPda] = anchor.web3.PublicKey.findProgramAddressSync(
+    [Buffer.from("counter"), movie_pda.toBuffer()],
+    program.programId
+  );
+
   it("Initializes the reward token", async () => {
     const tx = await program.methods
       .initializeTokenMint()
@@ -36,7 +41,7 @@ describe("anchor-movie-review-program", () => {
       .rpc();
   });
 
-  it("Movie review is added`", async () => {
+  it("Movie review is added", async () => {
     // Add your test here.
     const tokenAccount = await getAssociatedTokenAddress(
       mint,
@@ -49,6 +54,7 @@ describe("anchor-movie-review-program", () => {
         movieReview: movie_pda,
         mint: mint,
         tokenAccount: tokenAccount,
+        movieCommentCounter: commentCounterPda,
       })
       .rpc();
 
@@ -78,6 +84,36 @@ describe("anchor-movie-review-program", () => {
     expect(newRating === account.rating);
     expect(newDescription === account.description);
     expect(account.reviewer === provider.wallet.publicKey);
+  });
+
+  it("Adds a comment to a movie review", async () => {
+    const tokenAccount = await getAssociatedTokenAddress(
+      mint,
+      provider.wallet.publicKey
+    );
+
+    const commentCounter = await program.account.movieCommentCounter.fetch(
+      commentCounterPda
+    );
+
+    const [commentPda] = anchor.web3.PublicKey.findProgramAddressSync(
+      [
+        movie_pda.toBuffer(),
+        commentCounter.counter.toArrayLike(Buffer, "le", 8),
+      ],
+      program.programId
+    );
+
+    const tx = await program.methods
+      .addComment("Just a test comment")
+      .accounts({
+        movieReview: movie_pda,
+        mint: mint,
+        tokenAccount: tokenAccount,
+        movieCommentCounter: commentCounterPda,
+        movieComment: commentPda,
+      })
+      .rpc();
   });
 
   it("Deletes a movie review", async () => {
